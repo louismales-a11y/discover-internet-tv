@@ -170,7 +170,6 @@ class _ProviderDetailsScreenState extends State<ProviderDetailsScreen> {
   Widget _btn(IconData icon, String label, Color color, VoidCallback onTap) {
     return Container(
       decoration: BoxDecoration(border: Border.all(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(10)),
-      chil
       child: Material(color: Colors.transparent, child: InkWell(
         borderRadius: BorderRadius.circular(10), onTap: onTap,
         child: Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
