@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'dart:math';
+import 'dart:math';
 import '../models/iptv_provider.dart';
 import '../services/notes_service.dart';
 
@@ -13,7 +14,7 @@ class ProviderDetailsScreen extends StatefulWidget {
 }
 
 class _ProviderDetailsScreenState extends State<ProviderDetailsScreen> {
-  String? _note;
+  ProviderNotes? _notes;
   bool _loadingNote = true;
 
   @override
@@ -23,44 +24,77 @@ class _ProviderDetailsScreenState extends State<ProviderDetailsScreen> {
   }
 
   Future<void> _loadNote() async {
-    final n = await NotesService.getNote(widget.provider.name);
-    if (mounted) setState(() { _note = n; _loadingNote = false; });
+    final n = await NotesService.get(widget.provider.name);
+    if (mounted) setState(() { _notes = n; _loadingNote = false; });
   }
 
   Future<void> _editNote() async {
-    final ctrl = TextEditingController(text: _note ?? '');
-    final result = await showDialog<String>(
+    final n = _notes ?? ProviderNotes();
+    final textCtrl = TextEditingController(text: n.text);
+    final emailCtrl = TextEditingController(text: n.trialEmail);
+    bool trial = n.trialUsed;
+    double rating = n.rating;
+    await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDState) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF2A2A4E))),
         title: const Text('My Notes', style: TextStyle(color: Color(0xFFFFC107))),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 5,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Add your notes about this provider...',
-            filled: true, fillColor: const Color(0xFF0D0D1A),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Notes', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          TextField(controller: textCtrl, maxLines: 3, style: const TextStyle(color: Colors.white, fontSize: 13),
+            decoration: const InputDecoration(hintText: 'Your notes...', filled: true, fillColor: Color(0xFF0D0D1A), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none)),
           ),
-        ),
+          const SizedBox(height: 12),
+          const Text('Used Free Trial?', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          const SizedBox(height: 4),
+          Row(children: [
+            GestureDetector(onTap: () => setDState(() => trial = false),
+              child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(color: !trial ? const Color(0xFFFFC107) : const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3))),
+                child: const Text('No', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(onTap: () => setDState(() => trial = true),
+              child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(color: trial ? const Color(0xFFFFC107) : const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3))),
+                child: const Text('Yes', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ]),
+          if (trial) ...[
+            const SizedBox(height: 8),
+            const Text('Email used', style: TextStyle(color: Colors.grey, fontSize: 11)),
+            TextField(controller: emailCtrl, style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(hintText: 'email@example.com', filled: true, fillColor: Color(0xFF0D0D1A), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none)),
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Text('Rating', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          const SizedBox(height: 4),
+          Row(children: List.generate(5, (i) => GestureDetector(
+            onTap: () => setDState(() => rating = (i + 1).toDouble()),
+            child: Icon(i < rating.round() ? Icons.star : Icons.star_border, size: 32, color: const Color(0xFFFFC107)),
+          ))),
+        ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
-          TextButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('Save', style: TextStyle(color: Color(0xFFFFC107)))),
+          TextButton(onPressed: () async {
+            final updated = ProviderNotes(text: textCtrl.text, trialUsed: trial, trialEmail: emailCtrl.text, rating: rating);
+            await NotesService.save(widget.provider.name, updated);
+            if (ctx.mounted) Navigator.pop(ctx);
+          }, child: const Text('Save', style: TextStyle(color: Color(0xFFFFC107)))),
         ],
-      ),
+      )),
     );
-    if (result != null) {
-      await NotesService.setNote(widget.provider.name, result);
-      await _loadNote();
-    }
+    await _loadNote();
   }
 
   @override
   Widget build(BuildContext context) {
     final p = widget.provider;
-    final hasNote = _note != null && _note!.isNotEmpty;
+    final hasNote = _notes != null && (_notes!.text.isNotEmpty || _notes!.trialUsed || _notes!.rating > 0);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D1A),
@@ -70,7 +104,7 @@ class _ProviderDetailsScreenState extends State<ProviderDetailsScreen> {
         title: Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 16)),
         actions: [
           IconButton(
-            icon: Icon(hasNote ? Icons.sticky_note_2 : Icons.sticky_note_2_outlined, color: hasNote ? Color(0xFFFFC107) : Colors.grey),
+            icon: Icon(hasNote ? Icons.star : Icons.star_border, color: hasNote ? Color(0xFFFFC107) : Colors.grey),
             onPressed: _editNote,
           ),
         ],
@@ -116,7 +150,10 @@ class _ProviderDetailsScreenState extends State<ProviderDetailsScreen> {
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('My Notes', style: TextStyle(color: hasNote ? const Color(0xFFFFC107) : Colors.grey, fontSize: 11)),
                   const SizedBox(height: 2),
-                  Text(_loadingNote ? 'Loading...' : (hasNote ? _note! : 'Tap to add a note...'), style: TextStyle(color: hasNote ? Colors.white : Colors.grey, fontSize: 13)),
+                  Text(_loadingNote ? 'Loading...' : (hasNote ? (_notes!.text.isNotEmpty ? _notes!.text : 'Tap to add a note...') : 'Tap to add a note...'), style: TextStyle(color: hasNote ? Colors.white : Colors.grey, fontSize: 13)),
+                  if (hasNote && _notes!.rating > 0) const SizedBox(height: 4),
+                  if (hasNote && _notes!.rating > 0) Row(children: List.generate(5, (i) => Icon(i < _notes!.rating.round() ? Icons.star : Icons.star_border, size: 14, color: Color(0xFFFFC107)))),
+                  if (hasNote && _notes!.trialUsed) Text("Trial: " + (_notes!.trialEmail.isNotEmpty ? _notes!.trialEmail : "Yes"), style: TextStyle(color: Colors.grey, fontSize: 10)),
                 ])),
                 Icon(Icons.edit, size: 14, color: Colors.grey),
               ]),

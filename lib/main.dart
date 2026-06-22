@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'services/favorites_service.dart';
 import 'services/notes_service.dart';
 import 'screens/provider_details.dart';
@@ -53,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   List<IptvProvider> _providers = [];
   List<IptvProvider> _filtered = [];
-  List<IptvProvider> get _displayList => _showFavoritesOnly ? _filtered.where((p) => _favorites.contains(p.name)).toList() : _filtered;
+  List<IptvProvider> get _displayList => _filtered;
   bool _isLoading = false;
   String? _error;
   String _sortBy = 'Name';
@@ -63,6 +64,28 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() { super.initState(); _loadFavorites(); _loadDefault(); _checkUpdate(); }
 
+  Widget _featureItem(BuildContext ctx, IconData ic, String title, String desc) {
+    return GestureDetector(
+      onTap: () => showDialog(context: ctx, builder: (c2) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Color(0xFF2A2A4E))),
+        title: Row(children: [Icon(ic, size: 18, color: Color(0xFFFFC107)), const SizedBox(width: 8), Text(title, style: const TextStyle(color: Color(0xFFFFC107), fontSize: 16))]),
+        content: Text(desc, style: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 13, height: 1.4)),
+        actions: [TextButton(onPressed: () => Navigator.pop(c2), child: const Text("Got it", style: TextStyle(color: Color(0xFFFFC107))))],
+      )),
+      child: Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [
+        Icon(ic, size: 16, color: Color(0xFFFFC107)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 13)),
+          const SizedBox(height: 1),
+          Text("Tap for how-to", style: const TextStyle(color: Color(0xFF8888AA), fontSize: 9)),
+        ])),
+        const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+      ])),
+    );
+  }
+
   void _about(BuildContext c) {
     showDialog(
       context: c,
@@ -70,15 +93,26 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Color(0xFF2A2A4E))),
         title: const Text("About", style: TextStyle(color: Color(0xFFFFC107), fontSize: 18)),
-        content: const SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           Text("Discover Internet TV", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           Text("v1.0.0+15", style: TextStyle(color: Colors.grey, fontSize: 12)),
           SizedBox(height: 4),
-          Text("Created by LittleLouis", style: TextStyle(color: Color(0xFF8888AA), fontSize: 11)),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text("Created by LittleLouis", style: TextStyle(color: Color(0xFF8888AA), fontSize: 11)),
+          GestureDetector(
+            onTap: () async { try { await launchUrlString("mailto:louis.males@gmail.com"); } catch (_) {} },
+            child: const Text("louis.males@gmail.com", style: TextStyle(color: Color(0xFFFFC107), fontSize: 11, decoration: TextDecoration.underline)),
+          ),
+        ]),
           SizedBox(height: 16),
           Text("FEATURES", style: TextStyle(color: Color(0xFFFFC107), fontSize: 11, letterSpacing: 2)),
           SizedBox(height: 8),
-          Text("  150+ Providers  |  Favorites  |  Sort  |  Categories  |  Notes  |  Updates", style: TextStyle(color: Colors.grey, fontSize: 11)),
+          _featureItem(ctx, Icons.live_tv, "150+ Providers", "Browse and search IPTV providers. Use the search bar to find specific ones."),
+          _featureItem(ctx, Icons.star, "Favorites", "Tap the star icon on any provider to favorite it."),
+          _featureItem(ctx, Icons.sort, "Sort", "Tap the sort dropdown to reorder the list."),
+          _featureItem(ctx, Icons.category, "Categories", "Tap a category chip to filter providers."),
+          _featureItem(ctx, Icons.edit_note, "Notes", "Open any provider and tap the notes section."),
+          _featureItem(ctx, Icons.system_update, "Updates", "Auto-checks on startup. Tap Check Update in the menu."),
           SizedBox(height: 16),
           Text("BUILT WITH", style: TextStyle(color: Color(0xFF2196F3), fontSize: 11, letterSpacing: 2)),
           SizedBox(height: 8),
@@ -170,6 +204,11 @@ class _HomeScreenState extends State<HomeScreen> {
             final aC = int.tryParse((a.channels ?? '0').replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
             final bC = int.tryParse((b.channels ?? '0').replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
             return bC.compareTo(aC);
+          case "Favorites":
+            final aFav = _favorites.contains(a.name) ? 0 : 1;
+            final bFav = _favorites.contains(b.name) ? 0 : 1;
+            if (aFav != bFav) return aFav.compareTo(bFav);
+            return a.name.compareTo(b.name);
           default: return 0;
         }
       });
@@ -260,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _sortDropdown() {
-    final options = ['Name', 'Price', 'Channels'];
+    final options = ['Name', 'Price', 'Channels', 'Favorites'];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3)), borderRadius: BorderRadius.circular(6)),
