@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'services/favorites_service.dart';
+import 'services/notes_service.dart';
 import 'screens/provider_details.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/update_service.dart';
 import 'dart:async';
 import 'services/favorites_service.dart';
@@ -28,7 +30,15 @@ class DiscoverInternetTV extends StatelessWidget {
         appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF1A1A2E), foregroundColor: Color(0xFFFFC107), elevation: 0),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: FutureBuilder<bool>(
+        future: OnboardingScreen.shouldShow(),
+        builder: (ctx, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFFC107))));
+          }
+          return snap.data == true ? OnboardingScreen(home: const HomeScreen()) : const HomeScreen();
+        },
+      ),
     );
   }
 }
@@ -52,6 +62,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void initState() { super.initState(); _loadFavorites(); _loadDefault(); _checkUpdate(); }
+
+  void _about(BuildContext c) {
+    showDialog(
+      context: c,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Color(0xFF2A2A4E))),
+        title: const Text("About", style: TextStyle(color: Color(0xFFFFC107), fontSize: 18)),
+        content: const SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text("Discover Internet TV", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text("v1.0.0+15", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          SizedBox(height: 4),
+          Text("Created by LittleLouis", style: TextStyle(color: Color(0xFF8888AA), fontSize: 11)),
+          SizedBox(height: 16),
+          Text("FEATURES", style: TextStyle(color: Color(0xFFFFC107), fontSize: 11, letterSpacing: 2)),
+          SizedBox(height: 8),
+          Text("  150+ Providers  |  Favorites  |  Sort  |  Categories  |  Notes  |  Updates", style: TextStyle(color: Colors.grey, fontSize: 11)),
+          SizedBox(height: 16),
+          Text("BUILT WITH", style: TextStyle(color: Color(0xFF2196F3), fontSize: 11, letterSpacing: 2)),
+          SizedBox(height: 8),
+          Text("  Flutter 3.44.2  |  Dart 3.12.2  |  Android SDK 36", style: TextStyle(color: Colors.grey, fontSize: 11)),
+          Text("  VS Code  |  pi Coding Agent  |  DuckDuckGo", style: TextStyle(color: Colors.grey, fontSize: 11)),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close", style: TextStyle(color: Color(0xFFFFC107))))],
+      ),
+    );
+  }
+
+  Future<void> _searchNotes(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Add notes to providers first!"), backgroundColor: Color(0xFF2A2A4E)));
+  }
 
   Future<void> _checkUpdate() async {
     final update = await UpdateService.check();
@@ -148,7 +189,23 @@ class _HomeScreenState extends State<HomeScreen> {
           ]),
         ]),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh, color: Color(0xFFFFC107)), onPressed: () { _searchCtrl.clear(); _loadDefault(); }),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Color(0xFFFFC107)),
+            color: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Color(0xFF2A2A4E))),
+            onSelected: (v) {
+              if (v == "refresh") { _searchCtrl.clear(); _loadDefault(); }
+              else if (v == "about") _about(context);
+              else if (v == "notes") _searchNotes(context);
+              else if (v == "update") _checkUpdate();
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(value: "refresh", child: ListTile(leading: Icon(Icons.refresh, color: Color(0xFFFFC107)), title: Text("Refresh", style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero, dense: true)),
+              PopupMenuItem(value: "notes", child: ListTile(leading: Icon(Icons.search, color: Color(0xFFFFC107)), title: Text("Search Notes", style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero, dense: true)),
+              PopupMenuItem(value: "about", child: ListTile(leading: Icon(Icons.info_outline, color: Color(0xFFFFC107)), title: Text("About", style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero, dense: true)),
+              PopupMenuItem(value: "update", child: ListTile(leading: Icon(Icons.system_update, color: Color(0xFFFFC107)), title: Text("Check Update", style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero, dense: true)),
+            ],
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
